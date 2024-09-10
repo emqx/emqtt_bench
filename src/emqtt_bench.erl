@@ -642,8 +642,8 @@ run(Parent, I, N, PubSub, Opts0, AddrList, HostList) ->
                         []
                 end,
 
-    Opts1 = replace_opts(Opts0, [ {ifaddr, shard_addr(N, AddrList)}
-                                , {host, shard_addr(N, HostList)}
+    Opts1 = replace_opts(Opts0, [ {ifaddr, shard_addr(I, AddrList)}
+                                , {host, shard_addr(I, HostList)}
                                 ]),
     %% only the last one can send the 'go' signal
     Opts = [{send_go_signal, I + 1 =:= N} | Opts1],
