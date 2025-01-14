@@ -28,6 +28,9 @@
         , loop/5
         ]).
 
+%% Internal callback
+-export([wakeup_main_loop/2, main_loop/2]).
+
 -define(STARTNUMBER_DESC,
         "The start point when assigning sequence numbers to clients. "
         "This is useful when running multiple emqtt-bench "
@@ -386,11 +389,19 @@ main_loop(Uptime, Count) ->
             maybe_sum_qoe(Count),
             maybe_dump_nst_dets(Count),
             garbage_collect(),
-            main_loop(Uptime, Count);
+            hibernate_main_loop(Uptime, Count);
         Msg ->
             print("main_loop_msg: ~p~n", [Msg]),
-            main_loop(Uptime, Count)
+            hibernate_main_loop(Uptime, Count)
+    after 5 ->
+        hibernate_main_loop(Uptime, Count)
     end.
+
+hibernate_main_loop(Uptime, Count) ->
+    proc_lib:hibernate(?MODULE, wakeup_main_loop, [Uptime, Count]).
+
+wakeup_main_loop(Uptime, Count) ->
+    ?MODULE:main_loop(Uptime, Count).
 
 maybe_dump_nst_dets(Count)->
     Count == ets:info(quic_clients_nsts, size)
@@ -646,7 +657,6 @@ maybe_retry(Parent, N, PubSub, Opts, ContinueFn) ->
 loop(Parent, N, Client, PubSub, Opts) ->
     Interval = proplists:get_value(interval_of_msg, Opts, 0),
     Prometheus = lists:member(prometheus, Opts),
-    Idle = max(Interval * 2, 500),
     MRef = proplists:get_value(publish_signal_mref, Opts),
     receive
         {'DOWN', MRef, process, _Pid, start_publishing} ->
@@ -721,7 +731,7 @@ loop(Parent, N, Client, PubSub, Opts) ->
             io:format("client(~w): discarded unknown message ~p~n", [N, Other]),
             loop(Parent, N, Client, PubSub, Opts)
     after
-        Idle ->
+        _Idle = max(Interval * 2, 50) ->
             case proplists:get_bool(lowmem, Opts) of
                 true ->
                     erlang:garbage_collect(Client, [{type, major}]),

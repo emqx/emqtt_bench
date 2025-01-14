@@ -18,3 +18,5 @@ libquicer_nif.so
 rebar3
 *.crashdump
 _checkouts/
+.envrc
+erlang_ls.config
